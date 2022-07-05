@@ -1,8 +1,10 @@
 mod vec2;
+
 use sdl2::{
     event::Event,
     gfx::{framerate::FPSManager, primitives::DrawRenderer},
     keyboard::Keycode,
+    mouse::MouseButton,
     pixels::Color,
 };
 use vec2::Vec2;
@@ -35,7 +37,7 @@ struct Spring {
 }
 
 impl Spring {
-    pub const KS: f64 = 4750.0;
+    pub const KS: f64 = 5000.0;
     pub const KD: f64 = 100.0;
 
     pub fn new(a: usize, b: usize, l0: f64) -> Self {
@@ -49,7 +51,7 @@ struct Edge {
 }
 
 impl Edge {
-    const R: f64 = 10.0;
+    const R: f64 = 5.0;
 
     pub fn new(start: Vec2, end: Vec2) -> Self {
         Self { start, end }
@@ -150,6 +152,7 @@ fn collide_edge(particle: &mut Particle, edge: &Edge) {
 
     let d = Particle::R + Edge::R - particle.pos.dist(closest_point);
 
+
     if d >= 0.0 {
         particle.vel = particle.vel.reflect(line1.normal()) * 0.5;
         particle.pos += particle.vel.normalize() * d;
@@ -206,25 +209,6 @@ fn main() {
         Vec2::new(1920.0, 800.0),
     ));
 
-    spawn_rect(
-        10,
-        8,
-        155.0,
-        15.0,
-        &mut particles,
-        &mut springs,
-        &mut boundaries,
-    );
-    spawn_rect(
-        6,
-        8,
-        600.0,
-        250.0,
-        &mut particles,
-        &mut springs,
-        &mut boundaries,
-    );
-
     let ctx = sdl2::init().unwrap();
     let video = ctx.video().unwrap();
     let timer = ctx.timer().unwrap();
@@ -244,13 +228,16 @@ fn main() {
 
     let mut events = ctx.event_pump().unwrap();
 
-    let mut fps = FPSManager::new();
-    fps.set_framerate(60).unwrap();
+    let mut fps_manager = FPSManager::new();
+    fps_manager.set_framerate(60).unwrap();
 
-    let dt = 0.002f64;
+    let dt = 0.00125f64;
     let mut dt_acc = 0.0f64;
 
+    let mut fps = 0u8;
+
     let mut simulate = false;
+    let mut rect_start: Option<Vec2> = None;
 
     'running: loop {
         let begin = timer.ticks();
@@ -268,6 +255,41 @@ fn main() {
                 } => {
                     simulate = !simulate;
                 }
+                Event::MouseButtonDown {
+                    mouse_btn: MouseButton::Right,
+                    x,
+                    y,
+                    ..
+                } => {
+                    rect_start = Some(Vec2::new(x as f64, y as f64));
+                }
+                Event::MouseButtonUp {
+                    mouse_btn: MouseButton::Right,
+                    x,
+                    y,
+                    ..
+                } => {
+                    spawn_rect(
+                        ((rect_start.unwrap().x - x as f64).abs() / Particle::SPACING) as usize + 1,
+                        ((rect_start.unwrap().y - y as f64).abs() / Particle::SPACING) as usize + 1,
+                        f64::min(rect_start.unwrap().x, x as f64),
+                        f64::min(rect_start.unwrap().y, y as f64),
+                        &mut particles,
+                        &mut springs,
+                        &mut boundaries,
+                    );
+
+                    rect_start = None;
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Delete),
+                    ..
+                } => {
+                    particles.clear();
+                    springs.clear();
+                    boundaries.clear();
+                }
+
                 _ => {}
             }
         }
@@ -334,7 +356,7 @@ fn main() {
                 .unwrap();
         }
 
-        /* for particle in &particles {
+        for particle in &particles {
             canvas
                 .filled_circle(
                     particle.pos.x as i16,
@@ -342,9 +364,8 @@ fn main() {
                     Particle::R as i16,
                     Color::YELLOW,
                 )
-
                 .unwrap();
-        }*/
+        }
 
         for edge in &edges {
             canvas
@@ -359,11 +380,63 @@ fn main() {
                 .unwrap();
         }
 
+        if let Some(Vec2 { x, y }) = rect_start {
+            let mouse_state = events.mouse_state();
+            canvas
+                .rectangle(
+                    x as i16,
+                    y as i16,
+                    mouse_state.x() as i16,
+                    mouse_state.y() as i16,
+                    Color::RGB(44, 56, 80),
+                )
+                .unwrap();
+
+            let w = ((x - mouse_state.x() as f64).abs() / Particle::SPACING) as i16 + 1;
+            let h = ((y - mouse_state.y() as f64).abs() / Particle::SPACING) as i16 + 1;
+            canvas
+                .string(
+                    x as i16 + 10,
+                    y as i16 - 10,
+                    format!("{w} x {h}").as_str(),
+                    Color::RGB(44, 56, 80),
+                )
+                .unwrap();
+        }
+
+        canvas
+            .string(15, 15, format!("{fps} FPS").as_str(), Color::CYAN)
+            .unwrap();
+
+        canvas
+            .string(
+                10,
+                35,
+                format!("{} particles", particles.len()).as_str(),
+                Color::RGB(44, 56, 80),
+            )
+            .unwrap();
+
+        canvas
+            .string(
+                10,
+                45,
+                format!("{} springs", springs.len()).as_str(),
+                Color::RGB(44, 56, 80),
+            )
+            .unwrap();
+
         canvas.present();
-        fps.delay();
+        fps_manager.delay();
+
+        let dur = (timer.ticks() - begin) as f64;
+        let new_fps = (1000.0 / dur) as u8;
+        if new_fps.abs_diff(fps) > 10 {
+            fps = new_fps;
+        }
 
         if simulate {
-            dt_acc += (timer.ticks() - begin) as f64 / 1000.0;
+            dt_acc += dur / 1000.0;
         }
     }
 }
