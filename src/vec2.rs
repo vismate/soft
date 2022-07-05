@@ -124,6 +124,11 @@ impl Vec2 {
             Self::null()
         }
     }
+
+    pub fn normal(self) -> Self {
+        let n = self.normalize();
+        Vec2::new(n.y, -n.x)
+    }
 }
 
 impl Default for Vec2 {
@@ -145,30 +150,78 @@ impl_op!(+ |a: &Vec2, b: f64| -> Vec2 {Vec2 {x: a.x + b, y: a.y + b}});
 impl_op!(+= |a: &mut Vec2, b: f64| {a.x += b; a.y += b;});
 
 // Subtraction
-impl_op!(- |a: Vec2, b: Vec2| -> Vec2 {Vec2 {x: a.x - b.x, y: a.y - b.y}});
-impl_op!(- |a: &Vec2, b: &Vec2| -> Vec2 {Vec2 {x: a.x - b.x, y: a.y - b.y}});
-impl_op_commutative!(- |a: &Vec2, b: Vec2| -> Vec2 {Vec2 {x: a.x - b.x, y: a.y - b.y}});
+impl_op!(-|a: Vec2, b: Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x - b.x,
+        y: a.y - b.y,
+    }
+});
+impl_op!(-|a: &Vec2, b: &Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x - b.x,
+        y: a.y - b.y,
+    }
+});
+impl_op_commutative!(-|a: &Vec2, b: Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x - b.x,
+        y: a.y - b.y,
+    }
+});
 
 impl_op!(-= |a: &mut Vec2, b: Vec2| {a.x -= b.x; a.y -= b.y;});
 impl_op!(-= |a: &mut Vec2, b: &Vec2| {a.x -= b.x; a.y -= b.y;});
 
-impl_op!(- |a: Vec2, b: f64| -> Vec2 {Vec2 {x: a.x - b, y: a.y - b}});
-impl_op!(- |a: &Vec2, b: f64| -> Vec2 {Vec2 {x: a.x - b, y: a.y - b}});
+impl_op!(-|a: Vec2, b: f64| -> Vec2 {
+    Vec2 {
+        x: a.x - b,
+        y: a.y - b,
+    }
+});
+impl_op!(-|a: &Vec2, b: f64| -> Vec2 {
+    Vec2 {
+        x: a.x - b,
+        y: a.y - b,
+    }
+});
 impl_op!(-= |a: &mut Vec2, b: f64| {a.x -= b; a.y -= b;});
 
-
 // Multiplication
-impl_op!(* |a: Vec2, b: Vec2| -> Vec2 {Vec2 {x: a.x * b.x, y: a.y * b.y}});
-impl_op!(* |a: &Vec2, b: &Vec2| -> Vec2 {Vec2 {x: a.x * b.x, y: a.y * b.y}});
-impl_op_commutative!(* |a: &Vec2, b: Vec2| -> Vec2 {Vec2 {x: a.x * b.x, y: a.y * b.y}});
+impl_op!(*|a: Vec2, b: Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x * b.x,
+        y: a.y * b.y,
+    }
+});
+impl_op!(*|a: &Vec2, b: &Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x * b.x,
+        y: a.y * b.y,
+    }
+});
+impl_op_commutative!(*|a: &Vec2, b: Vec2| -> Vec2 {
+    Vec2 {
+        x: a.x * b.x,
+        y: a.y * b.y,
+    }
+});
 
 impl_op!(*= |a: &mut Vec2, b: Vec2| {a.x *= b.x; a.y *= b.y;});
 impl_op!(*= |a: &mut Vec2, b: &Vec2| {a.x *= b.x; a.y *= b.y;});
 
-impl_op_commutative!(* |a: Vec2, b: f64| -> Vec2 {Vec2 {x: a.x * b, y: a.y * b}});
-impl_op_commutative!(* |a: &Vec2, b: f64| -> Vec2 {Vec2 {x: a.x * b, y: a.y * b}});
+impl_op_commutative!(*|a: Vec2, b: f64| -> Vec2 {
+    Vec2 {
+        x: a.x * b,
+        y: a.y * b,
+    }
+});
+impl_op_commutative!(*|a: &Vec2, b: f64| -> Vec2 {
+    Vec2 {
+        x: a.x * b,
+        y: a.y * b,
+    }
+});
 impl_op!(*= |a: &mut Vec2, b: f64| {a.x *= b; a.y *= b;});
-
 
 // Division
 impl_op!(/ |a: Vec2, b: Vec2| -> Vec2 {Vec2 {x: a.x / b.x, y: a.y / b.y}});
@@ -183,5 +236,5 @@ impl_op!(/ |a: &Vec2, b: f64| -> Vec2 {Vec2 {x: a.x / b, y: a.y / b}});
 impl_op!(/= |a: &mut Vec2, b: f64| {a.x /= b; a.y /= b;});
 
 // Misc
-impl_op!(- |a: Vec2| -> Vec2 {Vec2{x: -a.x, y: -a.y}});
-impl_op!(- |a: &Vec2| -> Vec2 {Vec2{x: -a.x, y: -a.y}});
+impl_op!(-|a: Vec2| -> Vec2 { Vec2 { x: -a.x, y: -a.y } });
+impl_op!(-|a: &Vec2| -> Vec2 { Vec2 { x: -a.x, y: -a.y } });
