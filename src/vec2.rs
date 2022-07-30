@@ -1,13 +1,13 @@
-use auto_ops::*;
+use auto_ops::{impl_op, impl_op_commutative};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Vec2 {
     pub x: f64,
     pub y: f64,
 }
 
 impl Vec2 {
-    pub fn new(x: f64, y: f64) -> Self {
+    pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 
@@ -97,6 +97,41 @@ impl Vec2 {
         Self {
             x: self.x.recip(),
             y: self.x.recip(),
+        }
+    }
+
+    pub fn abs(self) -> Self {
+        Self {
+            x: self.x.abs(),
+            y: self.y.abs(),
+        }
+    }
+
+    pub fn abs_diff(self, other: Self) -> Self {
+        Self {
+            x: (self.x - other.x).abs(),
+            y: (self.y - other.y).abs(),
+        }
+    }
+
+    pub fn ceil(self) -> Self {
+        Self {
+            x: self.x.ceil(),
+            y: self.y.ceil(),
+        }
+    }
+
+    pub fn floor(self) -> Self {
+        Self {
+            x: self.x.floor(),
+            y: self.y.floor(),
+        }
+    }
+
+    pub fn trunc(self) -> Self {
+        Self {
+            x: self.x.trunc(),
+            y: self.y.trunc(),
         }
     }
 
