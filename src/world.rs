@@ -1,10 +1,16 @@
 use crate::{
     consts::{HEIGHT, WIDTH},
-    renderer::Renderer,
+    renderer::{Color, Renderer},
     vec2::Vec2,
 };
-use sdl2::pixels::Color;
+
 use serde::{Deserialize, Serialize};
+
+macro_rules! SQR {
+    ($e:expr) => {
+        $e * $e
+    };
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Particle {
@@ -16,7 +22,7 @@ pub struct Particle {
 impl Particle {
     pub const R: f64 = 7.25;
     pub const SPACING: f64 = 21.0;
-    pub const DIAG_SQR: f64 = 2.0 * Particle::SPACING * Particle::SPACING;
+    pub const DIAG_SQR: f64 = 2.0 * SQR!(Particle::SPACING);
 
     pub fn new(x: f64, y: f64) -> Self {
         Self {
@@ -25,10 +31,37 @@ impl Particle {
             acc: Vec2::null(),
         }
     }
+
+    pub fn collide(&mut self, other: &mut Self) {
+        let diff = other.pos - self.pos;
+        let diff_len_sqr = diff.len_sqr();
+
+        if SQR!(2.0 * Particle::R) >= diff_len_sqr {
+            // Static resolution
+            let diff_len = diff_len_sqr.sqrt();
+            let offset = 0.5 * (2.0 * Particle::R - diff_len) * (diff / diff_len);
+            self.pos -= offset;
+            other.pos += offset;
+
+            // Dynamic resolution
+            let diff_norm = (other.pos - self.pos) / (2.0 * Particle::R);
+            let vel_offset = (self.vel.dot(diff_norm) - other.vel.dot(diff_norm)) * diff_norm;
+
+            self.vel -= vel_offset;
+            other.vel += vel_offset;
+        }
+    }
+
+    pub fn integrate(&mut self, dt: f64) {
+        self.pos += self.vel * dt + 0.5 * self.acc * dt * dt;
+        self.vel += self.acc * dt;
+
+        self.acc = Vec2::null();
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Spring {
+struct Spring {
     a: usize,
     b: usize,
     l0: f64,
@@ -45,15 +78,61 @@ impl Spring {
 
 #[derive(Serialize, Deserialize)]
 pub struct Edge {
-    pub start: Vec2,
-    pub end: Vec2,
+    start: Vec2,
+    line: Vec2,
+    len_sqr: f64,
 }
 
 impl Edge {
     pub const R: f64 = 1.5 * Particle::R;
+    const FRICTION: f64 = 0.990;
 
     pub fn new(start: Vec2, end: Vec2) -> Self {
-        Self { start, end }
+        let line = end - start;
+        Self {
+            start,
+            line,
+            len_sqr: line.len_sqr(),
+        }
+    }
+
+    pub fn get_start(&self) -> Vec2 {
+        self.start
+    }
+
+    pub fn get_end(&self) -> Vec2 {
+        self.start + self.line
+    }
+
+    pub fn set_start(&mut self, start: Vec2) {
+        self.line += self.start - start;
+        self.len_sqr = self.line.len_sqr();
+        self.start = start;
+    }
+
+    pub fn set_end(&mut self, end: Vec2) {
+        self.line = end - self.start;
+        self.len_sqr = self.line.len_sqr();
+    }
+
+    pub fn collide(&self, particle: &mut Particle) {
+        let line2 = particle.pos - self.start;
+        let t = self.line.dot(line2).clamp(0.0, self.len_sqr) / self.len_sqr;
+
+        let closest_point = self.start + t * self.line;
+
+        let diff = particle.pos - closest_point;
+        let diff_len_sqr = diff.len_sqr();
+
+        if diff_len_sqr <= SQR!(Particle::R + Edge::R) {
+            let diff_len = diff_len_sqr.sqrt();
+            particle.pos += ((Particle::R + Edge::R) - diff_len) * (diff / diff_len);
+
+            let tangent = (particle.pos - closest_point) / (Edge::R + Particle::R);
+            let dp = particle.vel.dot(tangent);
+
+            particle.vel = (particle.vel - (dp * tangent) * 1.50) * Self::FRICTION;
+        }
     }
 }
 #[allow(dead_code)]
@@ -127,6 +206,7 @@ pub struct World {
 impl World {
     const DT: f64 = 0.00125;
     const GRID: f64 = HEIGHT / (Particle::R * 2.0);
+    const GRAVITY: Vec2 = Vec2::new(0.0, 350.0);
 
     pub fn new() -> Self {
         let mut world = World {
@@ -139,9 +219,7 @@ impl World {
             dt_acc: 0.0,
         };
 
-        world
-            .buckets
-            .resize((Self::GRID * Self::GRID) as usize, vec![]);
+        world.buckets.resize(SQR!(Self::GRID) as usize, vec![]);
         world
     }
 
@@ -253,7 +331,7 @@ impl World {
                 let mut collide_bucket = |z: usize| {
                     for j in &self.buckets[z] {
                         if i != *j {
-                            Self::collide_particle(&mut particle, &mut self.particles[*j]);
+                            particle.collide(&mut self.particles[*j]);
                         }
                     }
                 };
@@ -277,16 +355,16 @@ impl World {
                 }
 
                 //Gravity
-                particle.acc += Vec2::new(0.0, 350.0);
+                particle.acc += Self::GRAVITY;
 
-                Self::integrate(&mut particle);
+                particle.integrate(Self::DT);
 
                 self.particles[i] = particle;
             }
 
             for i in &self.boundaries {
                 for edge in &self.edges {
-                    Self::collide_edge(&mut self.particles[*i], edge);
+                    edge.collide(&mut self.particles[*i]);
                 }
             }
 
@@ -357,10 +435,10 @@ impl World {
         for edge in &self.edges {
             canvas
                 .set_color(Color::RGB(44, 56, 80))
-                .thick_line(edge.start, edge.end, Edge::R * 2.0)
+                .thick_line(edge.start, edge.get_end(), Edge::R * 2.0)
                 .set_color(Color::RGB(88, 112, 161))
                 .filled_circle(edge.start, Edge::R)
-                .filled_circle(edge.end, Edge::R);
+                .filled_circle(edge.get_end(), Edge::R);
         }
     }
 
@@ -392,7 +470,7 @@ impl World {
     }
 
     fn grid_idx(x: usize, y: usize) -> usize {
-        (x + y * Self::GRID as usize).clamp(0, (Self::GRID * Self::GRID) as usize - 1)
+        (x + y * Self::GRID as usize).clamp(0, SQR!(Self::GRID) as usize - 1)
     }
 
     fn update_spring(spring: &Spring, particles: &mut [Particle]) -> Result<(), f64> {
@@ -425,57 +503,5 @@ impl World {
         particles[spring.b].acc -= f;
 
         Ok(())
-    }
-
-    fn integrate(particle: &mut Particle) {
-        particle.pos += particle.vel * Self::DT + 0.5 * particle.acc * Self::DT * Self::DT;
-        particle.vel += particle.acc * Self::DT;
-
-        particle.acc = Vec2::null();
-    }
-
-    fn collide_edge(particle: &mut Particle, edge: &Edge) {
-        let line1 = edge.end - edge.start;
-        let line2 = particle.pos - edge.start;
-
-        let edge_len = line1.len_sqr();
-
-        let t = line1.dot(line2).clamp(0.0, edge_len) / edge_len;
-
-        let closest_point = edge.start + t * line1;
-
-        let diff = particle.pos - closest_point;
-        let diff_len = diff.len();
-        let overlap = (Particle::R + Edge::R) - diff_len;
-
-        if overlap > 0.0 {
-            const FRICTION: f64 = 0.990;
-            particle.pos += overlap * (diff / diff_len);
-
-            let tangent = (particle.pos - closest_point) / (Edge::R + Particle::R);
-            let dp = particle.vel.dot(tangent);
-
-            particle.vel = (particle.vel - (dp * tangent) * 1.50) * FRICTION;
-        }
-    }
-
-    fn collide_particle(this: &mut Particle, that: &mut Particle) {
-        let diff = that.pos - this.pos;
-        let diff_len = diff.len();
-        let overlap = 2.0 * Particle::R - diff_len;
-
-        if overlap > 0.0 {
-            // Static resolution
-            let offset = 0.5 * overlap * (diff / diff_len);
-            this.pos -= offset;
-            that.pos += offset;
-
-            // Dynamic resolution
-            let diff_norm = (that.pos - this.pos) / (2.0 * Particle::R);
-            let vel_offset = (this.vel.dot(diff_norm) - that.vel.dot(diff_norm)) * diff_norm;
-
-            this.vel -= vel_offset;
-            that.vel += vel_offset;
-        }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     consts::{HEIGHT, SAVEFILE, WIDTH},
-    renderer::Renderer,
+    renderer::{Color, Renderer},
     sdl2_renderer::SDL2CanvasWrapper,
     vec2::Vec2,
     world::{Edge, Particle, World},
@@ -10,7 +10,6 @@ use sdl2::{
     gfx::framerate::FPSManager,
     keyboard::{KeyboardState, Keycode, Mod, Scancode},
     mouse::{MouseButton, MouseState},
-    pixels::Color,
     video::{Window, WindowBuildError},
     EventPump, IntegerOrSdlError, TimerSubsystem,
 };
@@ -415,32 +414,41 @@ impl App {
                 .nth(n)
                 .expect("Index of edge should always be valid");
 
-            let end = match which_end {
-                EdgePoint::Start => &mut e.start,
-                EdgePoint::End => &mut e.end,
+            match which_end {
+                EdgePoint::Start => {
+                    self.canvas
+                        .set_color(Color::CYAN)
+                        .filled_circle(e.get_start(), Edge::R);
+
+                    if mouse.is_mouse_button_pressed(MouseButton::Left) {
+                        e.set_start(mouse_pos);
+                    } else {
+                        self.selected_edge = None;
+                    }
+                }
+                EdgePoint::End => {
+                    self.canvas
+                        .set_color(Color::CYAN)
+                        .filled_circle(e.get_end(), Edge::R);
+
+                    if mouse.is_mouse_button_pressed(MouseButton::Left) {
+                        e.set_end(mouse_pos);
+                    } else {
+                        self.selected_edge = None;
+                    }
+                }
             };
-
-            self.canvas
-                .set_color(Color::CYAN)
-                .filled_circle(*end, Edge::R);
-
-            if mouse.is_mouse_button_pressed(MouseButton::Left) {
-                *end = mouse_pos;
-            } else {
-                self.selected_edge = None;
-            }
         }
         //FIXME: This snippet must go after the previous. fix this.
         let mut itr = self.state.world.edges_iter().enumerate();
         while self.selected_edge.is_none() && let Some((i,e)) = itr.next() {
 
-            if Vec2::dist_sqr(e.start, mouse_pos) < Edge::R * Edge::R {
+            if Vec2::dist_sqr(e.get_start(), mouse_pos) < Edge::R * Edge::R {
                 self.selected_edge = Some((i, EdgePoint::Start));
-            } else if Vec2::dist_sqr(e.end, mouse_pos) < Edge::R * Edge::R {
+            } else if Vec2::dist_sqr(e.get_end(), mouse_pos) < Edge::R * Edge::R {
                 self.selected_edge = Some((i, EdgePoint::End));
             }
         }
-        drop(itr);
     }
 
     fn handle_new_line(&mut self, mouse_pos: Vec2) {

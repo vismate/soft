@@ -1,15 +1,24 @@
-use crate::{renderer::Renderer, vec2::Vec2};
+use crate::{
+    renderer::{Color, Renderer},
+    vec2::Vec2,
+};
 use sdl2::{
     gfx::primitives::DrawRenderer,
-    pixels::Color,
+    pixels::Color as Sdl2Color,
     render::{Canvas, RenderTarget},
 };
 
-pub struct SDL2CanvasWrapper<T: RenderTarget>(Canvas<T>, Color);
+pub struct SDL2CanvasWrapper<T: RenderTarget>(Canvas<T>, Sdl2Color);
 
 impl<T: RenderTarget> From<sdl2::render::Canvas<T>> for SDL2CanvasWrapper<T> {
     fn from(canvas: sdl2::render::Canvas<T>) -> Self {
-        Self(canvas, Color::RGBA(0, 0, 0, 0))
+        Self(canvas, Sdl2Color::RGBA(0, 0, 0, 0))
+    }
+}
+
+impl From<Color> for Sdl2Color {
+    fn from(Color { r, g, b, a }: Color) -> Self {
+        Self { r, g, b, a }
     }
 }
 
@@ -108,7 +117,7 @@ impl<T: RenderTarget> Renderer for SDL2CanvasWrapper<T> {
 
     fn set_color(&mut self, color: Color) -> &mut Self {
         self.0.set_draw_color(color);
-        self.1 = color;
+        self.1 = color.into();
 
         self
     }
