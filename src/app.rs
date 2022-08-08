@@ -125,6 +125,7 @@ impl App {
             .map_err(AppConstructorError::CouldNotCreateWindow)?;
         let canvas = window
             .into_canvas()
+            .accelerated()
             .build()
             .map_err(AppConstructorError::CouldNotGetCanvas)?
             .into();
